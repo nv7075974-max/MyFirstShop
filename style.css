@@ -38,3 +38,4 @@ main { max-width: 1000px; margin: 24px auto; padding: 0 16px; }
 }
 
 .card button:hover { background: #1d4ed8; }
+header { display: flex; justify-content: space-between; align-items: center; }
