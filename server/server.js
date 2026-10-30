@@ -31,6 +31,21 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
+app.get('/api/categories', async (req, res) => {
+  try {
+    const [rows] = await pool.execute(
+      `SELECT p.id, p.title, p.price, p.stock, p.category_id, c.name AS category
+       FROM products p
+       JOIN categories c ON c.id = p.category_id
+       ORDER BY p.id`
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Ошибка сервера' });
+  }
+});
+
 app.listen(process.env.PORT, () => {
   console.log('Сервер запущен: http://localhost:' + process.env.PORT);
 });
