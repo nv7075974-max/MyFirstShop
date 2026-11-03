@@ -1,19 +1,11 @@
-const products = [
-  { id: 1, title: 'Ноутбук 15"',       category: 'Компьютеры',   price: 85000 },
-  { id: 2, title: 'Монитор 27"',       category: 'Компьютеры',   price: 28000 },
-  { id: 3, title: 'Клавиатура',        category: 'Аксессуары',   price: 6500 },
-  { id: 4, title: 'Мышь беспроводная', category: 'Аксессуары',   price: 2500 },
-  { id: 5, title: 'Саундбар',          category: 'аудиотехника', price: 12000 },
-  { id: 6, title: 'Наушники',          category: 'Аксессуары',   price: 5499 },
-  { id: 7, title: 'Игровой стул',      category: 'Мебель',       price: 25000 },
-  { id: 8, title: 'SSD Диск 1ТБ',      category: 'Накопитель',   price: 14990 },
-  { id: 9, title: 'Игровой стол',      category: 'Мебель',       price: 9990 }
-];
+const API = 'http://localhost:3000/api';
+let products = [];
 const cart = [];
 
 const catalog = document.getElementById('catalog');
 const cartCount = document.getElementById('cart-count');
 const cartSum = document.getElementById('cart-sum');
+const nameInput = document.getElementById('customer-name');
 
 function renderProducts() {
   catalog.innerHTML = products.map(p => `
@@ -21,7 +13,8 @@ function renderProducts() {
       <div class="category">${p.category}</div>
       <h3>${p.title}</h3>
       <div class="price">${Number(p.price).toLocaleString('ru-RU')} ₽</div>
-      <button data-id="${p.id}">В корзину</button>
+      <div class="stock">В наличии: ${p.stock} шт.</div>
+      <button data-id="${p.id}" ${p.stock === 0 ? 'disabled' : ''}>В корзину</button>
     </div>
   `).join('');
 }
@@ -33,18 +26,56 @@ function renderCart() {
     .toLocaleString('ru-RU');
 }
 
+function groupCart() {
+  const counts = {};
+  cart.forEach(p => { counts[p.id] = (counts[p.id] || 0) + 1; });
+  return Object.entries(counts).map(([id, quantity]) => ({ id: Number(id), quantity }));
+}
+
 catalog.addEventListener('click', e => {
   if (e.target.tagName !== 'BUTTON') return;
   const product = products.find(p => p.id === Number(e.target.dataset.id));
+  const inCart = cart.filter(p => p.id === product.id).length;
+  if (inCart >= product.stock) {
+    alert('Больше нет в наличии');
+    return;
+  }
   cart.push(product);
   renderCart();
 });
 
-renderProducts();
+async function loadProducts() {
+  try {
+    const response = await fetch(API + '/products');
+    if (!response.ok) throw new Error('Ошибка сервера: ' + response.status);
+    products = await response.json();
+    renderProducts();
+  } catch (err) {
+    catalog.innerHTML = '<p>Не удалось загрузить товары. Запущен ли сервер?</p>';
+    console.error(err);
+  }
+}
 
-const clearCartBtn = document.getElementById("clear-cart-btn");
+async function checkout() {
+  const name = nameInput.value.trim();
+  if (!name) return alert('Введите имя');
+  if (cart.length === 0) return alert('Корзина пуста');
+  try {
+    const response = await fetch(API + '/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerName: name, items: groupCart() })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Ошибка оформления заказа');
+    alert('Заказ №' + data.orderId + ' оформлен. Сумма: ' + Number(data.total).toLocaleString('ru-RU') + ' ₽');
+    cart.length = 0;
+    renderCart();
+    await loadProducts();
+  } catch (err) {
+    alert(err.message);
+  }
+}
 
-clearCartBtn.addEventListener('click', () => {
-  cart.length = 0;
-  renderCart();
-});
+document.getElementById('checkout').addEventListener('click', checkout);
+loadProducts();
